@@ -77,6 +77,11 @@ Func ZoomOutBlueStacks2()
    ;Return ZoomOutCtrlClick(False, False, False)
 EndFunc
 
+Func ZoomOutBlueStacks5()
+	SetDebugLog("ZoomOutBlueStacks5()")
+	Return ZoomOutCtrlClick(False, False, False, 250)
+EndFunc
+
 Func ZoomOutMEmu()
 	SetDebugLog("ZoomOutMEmu()")
    Return DefaultZoomOut("{F3}", 0, ($g_iAndroidZoomoutMode <> 3))

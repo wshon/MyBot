@@ -169,6 +169,12 @@ Func getAllEmulators()
 		If GetVersionNormalized($__BlueStacks_Version) > GetVersionNormalized("1.0") Then $sEmulatorString &= "BlueStacks2|"
 	EndIf
 
+	; Bluestacks5 :
+	$__BlueStacks_nxt_Version = RegRead($g_sHKLM & "\SOFTWARE\BlueStacks_nxt\", "Version")
+	If Not @error Then
+		If GetVersionNormalized($__BlueStacks_nxt_Version) > GetVersionNormalized("5.0") Then $sEmulatorString &= "BlueStacks5|"
+	EndIf
+
 	; Nox :
 	Local $NoxEmulator = GetNoxPath()
 	If FileExists($NoxEmulator) Then $sEmulatorString &= "Nox|"
