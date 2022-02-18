@@ -17,24 +17,24 @@ Func ConvertOCRTime($sCaller, $sConvertTo, $bSetLog = True, $sReturnFormat = "mi
 	Local $iRemainTimer = 0, $avResult, $iDay = 0, $iHour = 0, $iMinute = 0, $iSecond = 0
 
 	If $sConvertTo <> "" Then
-		If StringInStr($sConvertTo, "d") > 1 Then
-			$avResult = StringSplit($sConvertTo, "d", $STR_NOCOUNT)
+		If StringInStr($sConvertTo, "天") > 1 Then
+			$avResult = StringSplit($sConvertTo, "天", $STR_NOCOUNT)
 			; $avResult[0] will be the Day and the $avResult[1] will be the rest
 			$iDay = Number($avResult[0])
 			$sConvertTo = $avResult[1]
 		EndIf
-		If StringInStr($sConvertTo, "h") > 1 Then
-			$avResult = StringSplit($sConvertTo, "h", $STR_NOCOUNT)
+		If StringInStr($sConvertTo, "小时") > 1 Then
+			$avResult = StringSplit($sConvertTo, "小时", $STR_NOCOUNT)
 			$iHour = Number($avResult[0])
 			$sConvertTo = $avResult[1]
 		EndIf
-		If StringInStr($sConvertTo, "m") > 1 Then
-			$avResult = StringSplit($sConvertTo, "m", $STR_NOCOUNT)
+		If StringInStr($sConvertTo, "分钟") > 1 Then
+			$avResult = StringSplit($sConvertTo, "分钟", $STR_NOCOUNT)
 			$iMinute = Number($avResult[0])
 			$sConvertTo = $avResult[1]
 		EndIf
-		If StringInStr($sConvertTo, "s") > 1 Then
-			$avResult = StringSplit($sConvertTo, "s", $STR_NOCOUNT)
+		If StringInStr($sConvertTo, "秒") > 1 Then
+			$avResult = StringSplit($sConvertTo, "秒", $STR_NOCOUNT)
 			$iSecond = Number($avResult[0])
 		EndIf
 
