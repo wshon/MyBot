@@ -949,7 +949,7 @@ Func CreateCustomTrainSubTab()
 	GUICtrlCreateLabel(GetTranslatedFileIni("MBR GUI Design Child Attack - Troops", "LblCountTotal", "Total"), $x + 341, $y + 7, -1, -1)
 	$g_hLblCountTotal = GUICtrlCreateLabel(0, $x + 368, $y + 7, 30, 15, $SS_CENTER)
 	_GUICtrlSetTip(-1, GetTranslatedFileIni("MBR GUI Design Child Attack - Troops", "LblCountTotal_Info_01", "The total Units of Troops should equal Total Army Camps."))
-	GUICtrlSetBkColor(-1, $COLOR_MONEYGREEN) ;lime, moneygreen
+	GUICtrlSetBkColor(-1, $COLOR_PALEGREEN) ;lime, moneygreen
 	GUICtrlCreateLabel("x", $x + 400, $y + 7, -1, -1)
 
 	$x = $iStartX
@@ -1239,7 +1239,7 @@ Func CreateCustomTrainSubTab()
 	GUICtrlCreateLabel(GetTranslatedFileIni("MBR GUI Design Child Attack - Troops", "LblCountTotal", "Total"), $x + 192, $y + 10, -1, -1)
 	$g_hLblCountTotalSiege = GUICtrlCreateLabel(0, $x + 220, $y + 10, 20, 15, $SS_CENTER)
 	_GUICtrlSetTip(-1, GetTranslatedFileIni("MBR GUI Design Child Attack - Troops", "LblCountTotal_Info_02", "The total units of Siege Machines"))
-	GUICtrlSetBkColor(-1, $COLOR_MONEYGREEN) ;lime, moneygreen
+	GUICtrlSetBkColor(-1, $COLOR_PALEGREEN) ;lime, moneygreen
 	GUICtrlCreateLabel("x", $x + 242, $y + 10, -1, -1)
 
 EndFunc   ;==>CreateCustomTrainSubTab

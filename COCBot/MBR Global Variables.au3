@@ -144,7 +144,6 @@ Global $g_oCOMErrorHandler = 0
 #Tidy_On
 #EndRegion debugging
 
-Global Const $COLOR_ORANGE = 0xFF7700 ; Used for donate GUI buttons
 Global Const $COLOR_ERROR = $COLOR_RED ; Error messages
 Global Const $COLOR_WARNING = $COLOR_MAROON ; Warning messages
 Global Const $COLOR_INFO = $COLOR_BLUE ; Information or Status updates for user
@@ -153,7 +152,7 @@ Global Const $COLOR_SUCCESS1 = 0x009900 ; Med green, optional success message fo
 Global Const $COLOR_DEBUG = $COLOR_PURPLE ; Purple, basic debug color
 Global Const $COLOR_DEBUG1 = 0x7A00CC ; Dark Purple, Debug for successful status checks
 Global Const $COLOR_DEBUG2 = 0xAA80FF ; lt Purple, secondary debug color
-Global Const $COLOR_DEBUGS = $COLOR_MEDGRAY ; Med Grey, debug color for less important but needed supporting data points in multiple messages
+Global Const $COLOR_DEBUGS = $COLOR_DARKGRAY ; Med Grey, debug color for less important but needed supporting data points in multiple messages
 Global Const $COLOR_ACTION = 0xFF8000 ; Med Orange, debug color for individual actions, clicks, etc
 Global Const $COLOR_ACTION1 = 0xCC80FF ; Light Purple, debug color for pixel/window checks
 
