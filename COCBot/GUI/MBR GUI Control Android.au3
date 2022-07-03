@@ -163,22 +163,23 @@ Func getAllEmulators()
 	GUICtrlSetData($g_hCmbAndroidEmulator, '')
 
 	; Bluestacks :
-	$__BlueStacks_Version = RegRead($g_sHKLM & "\SOFTWARE\" & $__BlueStacks_Name & "\", "Version")
+	$__BlueStacks_Version = RegRead($g_sHKLM & "\SOFTWARE\BlueStacks\", "Version")
 	If @error Then
 		$__BlueStacks_Version = RegRead($g_sHKLM & "\SOFTWARE\BlueStacks_bgp64_hyperv\", "Version")
 		If Not @error Then
 			$__BlueStacks_Name = "BlueStacks_bgp64_hyperv"
 		EndIf
 	EndIf
-	If @error Then
-		$__BlueStacks_Version = RegRead($g_sHKLM & "\SOFTWARE\BlueStacks_nxt\", "Version")
-		If Not @error Then
-			$__BlueStacks_Name = "BlueStacks_nxt"
-		EndIf
-	EndIf
 	If Not @error Then
 		If GetVersionNormalized($__BlueStacks_Version) < GetVersionNormalized("0.10") Then $sEmulatorString &= "BlueStacks|"
 		If GetVersionNormalized($__BlueStacks_Version) > GetVersionNormalized("1.0") Then $sEmulatorString &= "BlueStacks2|"
+	EndIf
+
+	; Bluestacks5 :
+	$__BlueStacks_Version = RegRead($g_sHKLM & "\SOFTWARE\BlueStacks_nxt\", "Version")
+	If Not @error Then
+		$__BlueStacks_Name = "BlueStacks_nxt"
+		If GetVersionNormalized($__BlueStacks_Version) > GetVersionNormalized("5.0") Then $sEmulatorString &= "BlueStacks5|"
 	EndIf
 
 	; Nox :

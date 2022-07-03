@@ -36,6 +36,10 @@ Func OpenBlueStacks2($bRestart = False)
 	Return OpenBlueStacksX($bRestart)
 EndFunc   ;==>OpenBlueStacks2
 
+Func OpenBlueStacks5($bRestart = False)
+	Return OpenBlueStacksX($bRestart)
+EndFunc   ;==>OpenBlueStacks5
+
 Func _OpenBlueStacks($bRestart = False)
 
 	Local $hTimer, $iCount = 0, $cmdPar
@@ -176,6 +180,10 @@ Func GetBlueStacks2AdbPath()
 	Return GetBlueStacksXAdbPath()
 EndFunc   ;==>GetBlueStacks2AdbPath
 
+Func GetBlueStacks5AdbPath()
+	Return GetBlueStacksXAdbPath()
+EndFunc   ;==>GetBlueStacks5AdbPath
+
 Func InitBlueStacksX($bCheckOnly = False, $bAdjustResolution = False, $bLegacyMode = False)
 
 	; more recent BlueStacks 2 version install VirtualBox based "plus" mode by default
@@ -186,6 +194,9 @@ Func InitBlueStacksX($bCheckOnly = False, $bAdjustResolution = False, $bLegacyMo
 	EndIf
 
 	Local $i, $aFiles = [$frontend_exe, "HD-Adb.exe", "HD-Quit.exe"] ; first element can be $frontend_exe array!
+	if $__BlueStacks_Name = "BlueStacks_nxt" Then
+		Local $i, $aFiles = [$frontend_exe, "HD-Adb.exe"]
+	EndIf
 	Local $Values[4][3] = [ _
 			["Screen Width", $g_iAndroidClientWidth, $g_iAndroidClientWidth], _
 			["Screen Height", $g_iAndroidClientHeight, $g_iAndroidClientHeight], _
@@ -201,6 +212,12 @@ Func InitBlueStacksX($bCheckOnly = False, $bAdjustResolution = False, $bLegacyMo
 		SetError(0, 0, 0)
 	EndIf
 	$__BlueStacks_Path = StringReplace($__BlueStacks_Path, "\\", "\")
+	$__BlueStacks_User_Path = RegRead($g_sHKLM & "\SOFTWARE\" & $__BlueStacks_Name & "\", "UserDefinedDir")
+	If @error <> 0 Then
+		$__BlueStacks_User_Path = @AppDataCommonDir & "\" & $__BlueStacks_Name & "\"
+		SetError(0, 0, 0)
+	EndIf
+	$__BlueStacks_User_Path = StringReplace($__BlueStacks_User_Path, "\\", "\")
 
 	Local $sPreferredADB = FindPreferredAdbPath()
 	If $sPreferredADB Then _ArrayDelete($aFiles, 1)
@@ -319,6 +336,29 @@ Func ConfigureSharedFolderBlueStacks2($iMode = 0, $bSetLog = Default)
 	ConfigureSharedFolderBlueStacksX($iMode, $bSetLog)
 EndFunc   ;==>ConfigureSharedFolderBlueStacks2
 
+Func ConfigureSharedFolderBlueStacks5($iMode = 0, $bSetLog = Default)
+	If $bSetLog = Default Then $bSetLog = True
+	Local $bResult = False
+
+	Switch $iMode
+		Case 0 ; check that shared folder is configured in VM
+			For $i = 0 To 5
+				If StringInStr(ConfigRead("bst.shared_folders"), "BstSharedFolder") > 0 Then
+					$bResult = True
+					$g_bAndroidSharedFolderAvailable = True
+					$g_sAndroidPicturesPath = "/storage/sdcard/windows/BstSharedFolder/"
+					$g_sAndroidPicturesHostPath = $__BlueStacks_User_Path & "Engine\UserData\SharedFolder\"
+					ExitLoop
+				EndIf
+			Next
+		Case 1 ; create missing shared folder
+		Case 2 ; Configure VM and add missing shared folder
+	EndSwitch
+
+	Return SetError(0, 0, $bResult)
+
+EndFunc   ;==>ConfigureSharedFolderBlueStacks5
+
 Func ConfigureSharedFolderBlueStacksX($iMode = 0, $bSetLog = Default)
 	If $bSetLog = Default Then $bSetLog = True
 	Local $bResult = False
@@ -397,6 +437,43 @@ Func InitBlueStacks2($bCheckOnly = False)
 	Return $bInstalled
 EndFunc   ;==>InitBlueStacks2
 
+Func InitBlueStacks5($bCheckOnly = False)
+	Local $bInstalled = InitBlueStacksX($bCheckOnly, True)
+	If $bInstalled And StringInStr($__BlueStacks_Version, "5.") <> 1 Then
+		If Not $bCheckOnly Then
+			SetLog("BlueStacks supported version 5.x not found", $COLOR_ERROR)
+			SetError(1, @extended, False)
+		EndIf
+		Return False
+	EndIf
+
+	If $bInstalled And Not $bCheckOnly Then
+		$__VBoxManage_Path = $__BlueStacks_Path & "BstkVMMgr.exe"
+		Local $bsNow = GetVersionNormalized($__BlueStacks_Version)
+		If $bsNow > GetVersionNormalized("4.0") Then
+			; only Version 4 requires new options
+			;$g_sAndroidAdbInstanceShellOptions = " -t -t" ; Additional shell options, only used by BlueStacks2 " -t -t"
+			$g_sAndroidAdbShellOptions = " /data/anr/../../system/xbin/bstk/su root" ; Additional shell options when launch shell with command, only used by BlueStacks2 " /data/anr/../../system/xbin/bstk/su root"
+
+			; tcp forward not working in BS4
+			$g_iAndroidAdbMinitouchMode = 1
+		EndIf
+
+		CheckBlueStacksVersionMod()
+
+		; read ADB port
+		Local $BstAdbPort = ConfigRead("bst.instance.Nougat64.status.adb_port")
+		If $BstAdbPort Then
+			$g_sAndroidAdbDevice = "127.0.0.1:" & $BstAdbPort
+		Else
+			; use default
+			$g_sAndroidAdbDevice = $g_avAndroidAppConfig[$__BS2_Idx][10]
+		EndIf
+	EndIf
+
+	Return $bInstalled
+EndFunc   ;==>InitBlueStacks5
+
 ; Will Check all the differences between versions
 Func CheckBlueStacksVersionMod()
 	Local $bsNow = GetVersionNormalized($__BlueStacks_Version)
@@ -464,6 +541,22 @@ Func GetBlueStacks2BackgroundMode()
 	EndSwitch
 EndFunc   ;==>GetBlueStacks2BackgroundMode
 
+Func GetBlueStacks5BackgroundMode()
+	; check if BlueStacks 5 is running in OpenGL mode
+	Local $GlRenderMode = ConfigRead("bst.instance.Nougat64.graphics_renderer")
+	Switch $GlRenderMode
+		Case "dx"
+			; DirectX
+			Return $g_iAndroidBackgroundModeDirectX
+		Case "gl"
+			; OpenGL
+			Return $g_iAndroidBackgroundModeOpenGL
+		Case Else
+			SetLog($g_sAndroidEmulator & " unsupported render mode " & $GlRenderMode, $COLOR_WARNING)
+			Return 0
+	EndSwitch
+EndFunc   ;==>GetBlueStacks5BackgroundMode
+
 ; Called from checkMainScreen
 Func RestartBlueStacksXCoC()
 	If Not $g_bRunState Then Return False
@@ -482,6 +575,10 @@ EndFunc   ;==>RestartBlueStacksCoC
 Func RestartBlueStacks2CoC()
 	Return RestartBlueStacksXCoC()
 EndFunc   ;==>RestartBlueStacks2CoC
+
+Func RestartBlueStacks5CoC()
+	Return RestartBlueStacksXCoC()
+EndFunc   ;==>RestartBlueStacks5CoC
 
 Func CheckScreenBlueStacksX($bSetLog = True)
 	Local $REGISTRY_KEY_DIRECTORY = $g_sHKLM & "\SOFTWARE\" & $__BlueStacks_Name & "\Guests\" & $g_sAndroidInstance & "\FrameBuffer\0"
@@ -530,6 +627,27 @@ Func CheckScreenBlueStacks2($bSetLog = True)
 	Return CheckScreenBlueStacksX($bSetLog)
 EndFunc   ;==>CheckScreenBlueStacks2
 
+Func CheckScreenBlueStacks5($bSetLog = True)
+	Local $aValues[3][2] = [ _
+			["dpi", 160], _
+			["fb_height", $g_iAndroidClientHeight], _
+			["fb_width", $g_iAndroidClientWidth], _
+			]
+	Local $i, $Value, $iErrCnt = 0
+	For $i = 0 To UBound($aValues) - 1
+		$Value = ConfigRead("bst.instance.Nougat64." & $aValues[$i][0])
+		If $Value <> $aValues[$i][1] Then
+			If $iErrCnt = 0 Then
+				SetDebugLog("MyBot doesn't work with " & $g_sAndroidEmulator & " screen configuration!", $COLOR_ERROR)
+			EndIf
+			SetDebugLog("Setting of " & $aValues[$i][0] & " is " & $Value & " and will be changed to " & $aValues[$i][1], $COLOR_ERROR)
+			$iErrCnt += 1
+		EndIf
+	Next
+	If $iErrCnt > 0 Then Return False
+	Return True
+EndFunc   ;==>CheckScreenBlueStacks5
+
 Func SetScreenBlueStacks()
 	Local $REGISTRY_KEY_DIRECTORY = $g_sHKLM & "\SOFTWARE\" & $__BlueStacks_Name & "\Guests\" & $g_sAndroidInstance & "\FrameBuffer\0"
 	RegWrite($REGISTRY_KEY_DIRECTORY, "FullScreen", "REG_DWORD", "0")
@@ -570,6 +688,10 @@ Func SetScreenBlueStacks2()
 	EndIf
 EndFunc   ;==>SetScreenBlueStacks2
 
+Func SetScreenBlueStacks5()
+    SetScreenBlueStacks2()
+EndFunc   ;==>SetScreenBlueStacks5
+
 Func RebootBlueStacksSetScreen()
 
 	Return RebootAndroidSetScreenDefault()
@@ -592,6 +714,10 @@ Func ConfigBlueStacks2WindowManager()
 	; Set font size to normal
 	AndroidSetFontSizeNormal()
 EndFunc   ;==>ConfigBlueStacks2WindowManager
+
+Func ConfigBlueStacks5WindowManager()
+    ConfigBlueStacks2WindowManager()
+EndFunc   ;==>ConfigBlueStacks5WindowManager
 
 Func RebootBlueStacks2SetScreen($bOpenAndroid = True)
 
@@ -617,6 +743,10 @@ Func RebootBlueStacks2SetScreen($bOpenAndroid = True)
 
 EndFunc   ;==>RebootBlueStacks2SetScreen
 
+Func RebootBlueStacks5SetScreen($bOpenAndroid = True)
+    RebootBlueStacks2SetScreen($bOpenAndroid)
+EndFunc   ;==>RebootBlueStacks5SetScreen
+
 Func GetBlueStacksRunningInstance($bStrictCheck = True)
 	WinGetAndroidHandle()
 	Local $a[2] = [$g_hAndroidWindow, ""]
@@ -637,16 +767,21 @@ Func GetBlueStacks2RunningInstance($bStrictCheck = True)
 	Return $a
 EndFunc   ;==>GetBlueStacks2RunningInstance
 
+Func GetBlueStacks5RunningInstance($bStrictCheck = True)
+    GetBlueStacks2RunningInstance($bStrictCheck)
+EndFunc   ;==>GetBlueStacks5RunningInstance
+
 Func GetBlueStacksProgramParameter($bAlternative = False)
 	Return $g_sAndroidInstance
 EndFunc   ;==>GetBlueStacksProgramParameter
 
 Func GetBlueStacks2ProgramParameter($bAlternative = False)
-	;~ If RegRead($g_sHKLM & "\SOFTWARE\" & $__BlueStacks_Name & "\Config", "Oem") = "bgp64_hyperv" Then
-	;~ 	Return $g_sAndroidInstance & " -h"
-	;~ EndIf
 	Return $g_sAndroidInstance
 EndFunc   ;==>GetBlueStacks2ProgramParameter
+
+Func GetBlueStacks5ProgramParameter($bAlternative = False)
+	Return "--instance " & $g_sAndroidInstance
+EndFunc   ;==>GetBlueStacks5ProgramParameter
 
 Func BlueStacksBotStartEvent()
 	If $g_bAndroidEmbedded = False Then
@@ -676,6 +811,10 @@ Func BlueStacks2BotStartEvent()
 	Return False
 EndFunc   ;==>BlueStacks2BotStartEvent
 
+Func BlueStacks5BotStartEvent()
+    BlueStacks2BotStartEvent()
+EndFunc   ;==>BlueStacks5BotStartEvent
+
 Func BlueStacks2BotStopEvent()
 	If $g_bAndroidEmbedded = False Then
 		SetDebugLog("Enable " & $g_sAndroidEmulator & " minimize/maximize Window Buttons")
@@ -685,6 +824,10 @@ Func BlueStacks2BotStopEvent()
 	If $g_bAndroidHasSystemBar Then Return AndroidOpenSystemBar()
 	Return False
 EndFunc   ;==>BlueStacks2BotStopEvent
+
+Func BlueStacks5BotStopEvent()
+    BlueStacks2BotStopEvent()
+EndFunc   ;==>BlueStacks5BotStopEvent
 
 Func BlueStacksAdjustClickCoordinates(ByRef $x, ByRef $y)
 	$x = Round(32767.0 / $g_iAndroidClientWidth * $x)
@@ -698,6 +841,10 @@ Func BlueStacks2AdjustClickCoordinates(ByRef $x, ByRef $y)
 	;$x = Int(($Num * $x) / $g_iAndroidClientWidth)
 	;$y = Int(($Num * $y) / $g_iAndroidClientHeight)
 EndFunc   ;==>BlueStacks2AdjustClickCoordinates
+
+Func BlueStacks5AdjustClickCoordinates(ByRef $x, ByRef $y)
+    BlueStacks2AdjustClickCoordinates($x, $y)
+EndFunc   ;==>BlueStacks5AdjustClickCoordinates
 
 Func DisableBS($HWnD, $iButton)
 	Local $hSysMenu = _GUICtrlMenu_GetSystemMenu($HWnD, 0)
@@ -832,6 +979,10 @@ Func CloseBlueStacks2()
 
 EndFunc   ;==>CloseBlueStacks2
 
+Func CloseBlueStacks5()
+    CloseBlueStacks2()
+EndFunc   ;==>CloseBlueStacks2
+
 Func KillBSProcess()
 
 	Local $aBS_FileNames[8][2] = [['HD-Agent.exe', 0], ['HD-BlockDevice.exe', 0], ['HD-Frontend.exe', 0], _
@@ -905,6 +1056,10 @@ Func CloseUnsupportedBlueStacks2()
 	Return CloseUnsupportedBlueStacksX()
 EndFunc   ;==>CloseUnsupportedBlueStacks2
 
+Func CloseUnsupportedBlueStacks5()
+	Return CloseUnsupportedBlueStacksX()
+EndFunc   ;==>CloseUnsupportedBlueStacks5
+
 Func CloseUnsupportedBlueStacksX($bClose = True)
 	Local $WinTitleMatchMode = Opt("WinTitleMatchMode", -3) ; in recent 2.3.x can be also "BlueStacks App Player"
 	Local $sPartnerExePath = RegRead($g_sHKLM & "\SOFTWARE\" & $__BlueStacks_Name & "\Config\", "PartnerExePath")
@@ -921,4 +1076,22 @@ Func CloseUnsupportedBlueStacksX($bClose = True)
 	Opt("WinTitleMatchMode", $WinTitleMatchMode)
 	Return False
 EndFunc   ;==>CloseUnsupportedBlueStacksX
+
+Func GetBlueStacks5ConfigFile()
+	Return $__BlueStacks_User_Path & "bluestacks.conf"
+EndFunc   ;==>GetBlueStacks5ConfigFile
+
+Func ConfigRead($sKey)
+	Local $aConfig, $aSplit
+	Local $sConfigFile = GetBlueStacks5ConfigFile()
+	_FileReadToArray($sConfigFile, $aConfig, $FRTA_NOCOUNT)
+    For $i = 0 To UBound($aConfig) - 1
+        If StringLeft($aConfig[$i], StringLen($sKey) + 1) = $sKey & '=' Then
+			$aSplit = StringSplit($aConfig[$i], '=')
+			SetDebugLog("ConfigRead" & $aSplit[1] & "=" & $aSplit[2])
+            Return StringMid($aSplit[2], 2, StringLen($aSplit[2]) - 2)
+        EndIf
+    Next
+	Return Null
+EndFunc   ;==>_ChangeValueForKey
 
