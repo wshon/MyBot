@@ -225,7 +225,7 @@ Func getAllEmulatorsInstances()
 		Case "BlueStacks"
 			GUICtrlSetData($g_hCmbAndroidInstance, "Android", "Android")
 			Return
-		Case "BlueStacks2"
+		Case "BlueStacks2", "BlueStacks5"
 			Local $VMsBlueStacks = RegRead($g_sHKLM & "\SOFTWARE\" & $__BlueStacks_Name & "\", "DataDir")
 			$sEmulatorPath = $VMsBlueStacks ; C:\ProgramData\BlueStacks\Engine
 		Case "Nox"
@@ -242,6 +242,7 @@ Func getAllEmulatorsInstances()
 	; BS Multi Instance
 	Local $sBlueStacksFolder = ""
 	If $Emulator = "BlueStacks2" Then $sBlueStacksFolder = "Android"
+	If $Emulator = "BlueStacks5" Then $sBlueStacksFolder = "Nougat64"
 
 	; Getting all VM Folders
 	Local $aEmulatorFolders = _FileListToArray($sEmulatorPath, $sBlueStacksFolder & "*", $FLTA_FOLDERS)
