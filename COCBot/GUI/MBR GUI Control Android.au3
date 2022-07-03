@@ -163,7 +163,19 @@ Func getAllEmulators()
 	GUICtrlSetData($g_hCmbAndroidEmulator, '')
 
 	; Bluestacks :
-	$__BlueStacks_Version = RegRead($g_sHKLM & "\SOFTWARE\BlueStacks\", "Version")
+	$__BlueStacks_Version = RegRead($g_sHKLM & "\SOFTWARE\" & $__BlueStacks_Name & "\", "Version")
+	If @error Then
+		$__BlueStacks_Version = RegRead($g_sHKLM & "\SOFTWARE\BlueStacks_bgp64_hyperv\", "Version")
+		If Not @error Then
+			$__BlueStacks_Name = "BlueStacks_bgp64_hyperv"
+		EndIf
+	EndIf
+	If @error Then
+		$__BlueStacks_Version = RegRead($g_sHKLM & "\SOFTWARE\BlueStacks_nxt\", "Version")
+		If Not @error Then
+			$__BlueStacks_Name = "BlueStacks_nxt"
+		EndIf
+	EndIf
 	If Not @error Then
 		If GetVersionNormalized($__BlueStacks_Version) < GetVersionNormalized("0.10") Then $sEmulatorString &= "BlueStacks|"
 		If GetVersionNormalized($__BlueStacks_Version) > GetVersionNormalized("1.0") Then $sEmulatorString &= "BlueStacks2|"
@@ -213,7 +225,7 @@ Func getAllEmulatorsInstances()
 			GUICtrlSetData($g_hCmbAndroidInstance, "Android", "Android")
 			Return
 		Case "BlueStacks2"
-			Local $VMsBlueStacks = RegRead($g_sHKLM & "\SOFTWARE\BlueStacks\", "DataDir")
+			Local $VMsBlueStacks = RegRead($g_sHKLM & "\SOFTWARE\" & $__BlueStacks_Name & "\", "DataDir")
 			$sEmulatorPath = $VMsBlueStacks ; C:\ProgramData\BlueStacks\Engine
 		Case "Nox"
 			$sEmulatorPath = GetNoxPath() & "\BignoxVMS"  ; C:\Program Files\Nox\bin\BignoxVMS
