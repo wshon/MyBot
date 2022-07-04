@@ -165,6 +165,7 @@ Func ReferenceFunctions()
 	GetNoxBackgroundMode()
 	ConfigureSharedFolderBlueStacks()
 	ConfigureSharedFolderBlueStacks2()
+	ConfigureSharedFolderBlueStacks5()
 	; DonateCC.au3
 	getChatString(0, 0, 0)
 	getChatStringChinese(0, 0)
