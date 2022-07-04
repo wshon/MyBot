@@ -18,14 +18,18 @@ Func OpenBS($bRestart = False) ; @deprecated, use OpenAndroid()
 EndFunc   ;==>OpenBS
 
 Func OpenBlueStacksX($bRestart = False)
-	SetLog("Starting BlueStacks and Clash Of Clans", $COLOR_SUCCESS)
+	SetLog("Starting " & g_sAndroidEmulator & " and Clash Of Clans", $COLOR_SUCCESS)
 	If Not InitAndroid() Then Return False
 	If $g_sAndroidEmulator = "BlueStacks" Then
 		; open BlueStacks version 1
 		Return _OpenBlueStacks($bRestart)
 	EndIf
+	If $g_sAndroidEmulator = "BlueStacks2" Then
+		; open BlueStacks version 2,3,4
+		Return _OpenBlueStacks2($bRestart)
+	EndIf
 	; open newer BlueStacks versions
-	Return _OpenBlueStacks2($bRestart)
+	Return _OpenBlueStacks5($bRestart)
 EndFunc   ;==>OpenBlueStacksX
 
 Func OpenBlueStacks($bRestart = False)
@@ -166,6 +170,79 @@ Func _OpenBlueStacks2($bRestart = False)
 
 EndFunc   ;==>_OpenBlueStacks2
 
+Func _OpenBlueStacks5($bRestart = False)
+
+	Local $hTimer, $iCount = 0, $cmdOutput, $process_killed, $i, $connected_to, $PID, $cmdPar
+
+	CloseUnsupportedBlueStacks5()
+
+	; always start ADB first to avoid ADB connection problems
+	LaunchConsole($g_sAndroidAdbPath, AddSpace($g_sAndroidAdbGlobalOptions) & "start-server", $process_killed)
+
+	$hTimer = __TimerInit()
+	WinGetAndroidHandle()
+	Local $bStopIfLaunchFails = False
+	While $g_hAndroidControl = 0
+		If Not $g_bRunState Then Return False
+		; check that HD-Frontend.exe process is really there
+		;$cmdPar = " -t " & $g_sAndroidInstance
+		$cmdPar = GetAndroidProgramParameter()
+		$PID = LaunchAndroid($g_sAndroidProgramPath, $cmdPar, $g_sAndroidPath, Default, $bStopIfLaunchFails)
+		If $PID > 0 Then $PID = ProcessExists2($g_sAndroidProgramPath, $cmdPar)
+		If $PID <= 0 Then
+			CloseAndroid("OpenBlueStacks5")
+			SetScreenBlueStacks5()
+			$bStopIfLaunchFails = True
+			If _Sleep(1000) Then Return False
+		EndIf
+
+		_StatusUpdateTime($hTimer)
+		If __TimerDiff($hTimer) > $g_iAndroidLaunchWaitSec * 1000 Or ($PID = 0 And $bStopIfLaunchFails = True) Then ; if no BS position returned in 4 minutes, BS/PC has major issue so exit
+			SetScreenBlueStacks5()
+			SetLog("Serious error has occurred, please restart PC and try again", $COLOR_ERROR)
+			SetLog($g_sAndroidEmulator & " refuses to load, waited " & Round(__TimerDiff($hTimer) / 1000, 2) & " seconds", $COLOR_ERROR)
+			SetError(1, @extended, False)
+			Return False
+		EndIf
+		If _Sleep(3000) Then Return False
+		_StatusUpdateTime($hTimer, $g_sAndroidEmulator & " Starting")
+		WinGetAndroidHandle()
+	WEnd
+
+	; enable window title so BS2 can be moved again
+	WinGetAndroidHandle()
+	Local $aWin = WinGetPos($g_hAndroidWindow)
+	Local $lCurStyle = _WinAPI_GetWindowLong($g_hAndroidWindow, $GWL_STYLE)
+	; Enable Title Bar and Border
+	_WinAPI_SetWindowLong($g_hAndroidWindow, $GWL_STYLE, BitOR($lCurStyle, $WS_CAPTION, $WS_SYSMENU))
+	Local $iCaptionHeight = _WinAPI_GetSystemMetrics($SM_CYCAPTION)
+	If BitAND($lCurStyle, BitOR($WS_CAPTION, $WS_SYSMENU)) <> BitOR($WS_CAPTION, $WS_SYSMENU) And UBound($aWin) > 3 Then
+		; adjust window height due to caption
+		WinMove2($g_hAndroidWindow, "", $aWin[0], $aWin[1], $aWin[2], $aWin[3] + $iCaptionHeight)
+	EndIf
+	;_WinAPI_SetWindowPos($g_hAndroidWindow, 0, 0, 0, 0, 0, BitOr($SWP_NOMOVE, $SWP_NOSIZE, $SWP_FRAMECHANGED)) ; redraw
+
+	If $g_hAndroidControl Then
+		$connected_to = ConnectAndroidAdb(False, 3000) ; small time-out as ADB connection must be available now
+
+		;If WaitForDeviceBlueStacks5($g_iAndroidLaunchWaitSec - __TimerDiff($hTimer) / 1000, $hTimer) Then Return
+		If WaitForAndroidBootCompleted($g_iAndroidLaunchWaitSec - __TimerDiff($hTimer) / 1000, $hTimer) Then Return
+		If Not $g_bRunState Then Return False
+
+		SetLog($g_sAndroidEmulator & " Loaded, took " & Round(__TimerDiff($hTimer) / 1000, 2) & " seconds to begin.", $COLOR_SUCCESS)
+		AndroidAdbLaunchShellInstance()
+
+		If Not $g_bRunState Then Return False
+		ConfigBlueStacks5WindowManager()
+
+		Return True
+
+	EndIf
+
+	Return False
+
+EndFunc   ;==>_OpenBlueStacks5
+
 Func GetBlueStacksXAdbPath()
 	Local $adbPath = $__BlueStacks_Path & "HD-Adb.exe"
 	If FileExists($adbPath) Then Return $adbPath
@@ -211,12 +288,14 @@ Func InitBlueStacksX($bCheckOnly = False, $bAdjustResolution = False, $bLegacyMo
 		$__BlueStacks_Path = @ProgramFilesDir & "\BlueStacks\"
 		SetError(0, 0, 0)
 	EndIf
+	If StringRight($__BlueStacks_Path, 1) <> "\" Then $__BlueStacks_Path &= "\"
 	$__BlueStacks_Path = StringReplace($__BlueStacks_Path, "\\", "\")
 	$__BlueStacks_User_Path = RegRead($g_sHKLM & "\SOFTWARE\" & $__BlueStacks_Name & "\", "UserDefinedDir")
 	If @error <> 0 Then
 		$__BlueStacks_User_Path = @AppDataCommonDir & "\" & $__BlueStacks_Name & "\"
 		SetError(0, 0, 0)
 	EndIf
+	If StringRight($__BlueStacks_User_Path, 1) <> "\" Then $__BlueStacks_User_Path &= "\"
 	$__BlueStacks_User_Path = StringReplace($__BlueStacks_User_Path, "\\", "\")
 
 	Local $sPreferredADB = FindPreferredAdbPath()
@@ -257,14 +336,19 @@ Func InitBlueStacksX($bCheckOnly = False, $bAdjustResolution = False, $bLegacyMo
 		; re-check BlueStacks / BlueStacks2 key and adjust based on found version as only one BlueStacks version can be installed!
 		Local $sAndroidEmulator = $g_sAndroidEmulator
 		Local $bIsVersion1 = GetVersionNormalized($__BlueStacks_Version) > GetVersionNormalized("0.8") And GetVersionNormalized($__BlueStacks_Version) < GetVersionNormalized("2.0")
-		If $bIsVersion1 And $g_sAndroidEmulator = "BlueStacks2" Then
+		If $bIsVersion1 And $g_sAndroidEmulator <> "BlueStacks" Then
 			; switch to BlueStacks key
 			$sAndroidEmulator = "BlueStacks"
 		EndIf
 		Local $bIsVersion2 = GetVersionNormalized($__BlueStacks_Version) > GetVersionNormalized("2.0") And GetVersionNormalized($__BlueStacks_Version) < GetVersionNormalized("5.0")
-		If $bIsVersion2 And $g_sAndroidEmulator = "BlueStacks" Then
+		If $bIsVersion2 And $g_sAndroidEmulator <> "BlueStacks2" Then
 			; switch to BlueStacks2 key
 			$sAndroidEmulator = "BlueStacks2"
+		EndIf
+		Local $bIsVersion2 = GetVersionNormalized($__BlueStacks_Version) > GetVersionNormalized("5.0") And GetVersionNormalized($__BlueStacks_Version) < GetVersionNormalized("6.0")
+		If $bIsVersion2 And $g_sAndroidEmulator <> "BlueStacks5" Then
+			; switch to BlueStacks5 key
+			$sAndroidEmulator = "BlueStacks5"
 		EndIf
 		If $sAndroidEmulator <> $g_sAndroidEmulator Then
 			SetLog("Changing Android Emulator config from " & $g_sAndroidEmulator & " to " & $sAndroidEmulator, $COLOR_WARNING)
@@ -289,7 +373,7 @@ Func InitBlueStacksX($bCheckOnly = False, $bAdjustResolution = False, $bLegacyMo
 		If $g_sAndroidAdbPath = "" Then $g_sAndroidAdbPath = $__BlueStacks_Path & "HD-Adb.exe"
 		$g_sAndroidVersion = $__BlueStacks_Version
 
-		ConfigureSharedFolderBlueStacksX(0) ; something like D:\ProgramData\BlueStacks\Engine\UserData\SharedFolder\
+		ConfigureSharedFolder(0) ; something like D:\ProgramData\BlueStacks\Engine\UserData\SharedFolder\
 
 		SetDebugLog($g_sAndroidEmulator & " Engine 'Plus'-Mode: " & $plusMode)
 		SetDebugLog($g_sAndroidEmulator & " OEM Features: " & $OEMFeatures)
@@ -336,29 +420,6 @@ Func ConfigureSharedFolderBlueStacks2($iMode = 0, $bSetLog = Default)
 	ConfigureSharedFolderBlueStacksX($iMode, $bSetLog)
 EndFunc   ;==>ConfigureSharedFolderBlueStacks2
 
-Func ConfigureSharedFolderBlueStacks5($iMode = 0, $bSetLog = Default)
-	If $bSetLog = Default Then $bSetLog = True
-	Local $bResult = False
-
-	Switch $iMode
-		Case 0 ; check that shared folder is configured in VM
-			For $i = 0 To 5
-				If StringInStr(ConfigRead("bst.shared_folders"), "BstSharedFolder") > 0 Then
-					$bResult = True
-					$g_bAndroidSharedFolderAvailable = True
-					$g_sAndroidPicturesPath = "/storage/sdcard/windows/BstSharedFolder/"
-					$g_sAndroidPicturesHostPath = $__BlueStacks_User_Path & "Engine\UserData\SharedFolder\"
-					ExitLoop
-				EndIf
-			Next
-		Case 1 ; create missing shared folder
-		Case 2 ; Configure VM and add missing shared folder
-	EndSwitch
-
-	Return SetError(0, 0, $bResult)
-
-EndFunc   ;==>ConfigureSharedFolderBlueStacks5
-
 Func ConfigureSharedFolderBlueStacksX($iMode = 0, $bSetLog = Default)
 	If $bSetLog = Default Then $bSetLog = True
 	Local $bResult = False
@@ -381,6 +442,29 @@ Func ConfigureSharedFolderBlueStacksX($iMode = 0, $bSetLog = Default)
 	Return SetError(0, 0, $bResult)
 
 EndFunc   ;==>ConfigureSharedFolderBlueStacksX
+
+Func ConfigureSharedFolderBlueStacks5($iMode = 0, $bSetLog = Default)
+	If $bSetLog = Default Then $bSetLog = True
+	Local $bResult = False
+
+	Switch $iMode
+		Case 0 ; check that shared folder is configured in VM
+			For $i = 0 To 5
+				If StringInStr(ConfigRead("bst.shared_folders"), "BstSharedFolder") > 0 Then
+					$bResult = True
+					$g_bAndroidSharedFolderAvailable = True
+					$g_sAndroidPicturesPath = "/storage/sdcard/windows/BstSharedFolder/"
+					$g_sAndroidPicturesHostPath = $__BlueStacks_User_Path & "Engine\UserData\SharedFolder\"
+					ExitLoop
+				EndIf
+			Next
+		Case 1 ; create missing shared folder
+		Case 2 ; Configure VM and add missing shared folder
+	EndSwitch
+
+	Return SetError(0, 0, $bResult)
+
+EndFunc   ;==>ConfigureSharedFolderBlueStacks5
 
 Func InitBlueStacks($bCheckOnly = False)
 	Local $bInstalled = InitBlueStacksX($bCheckOnly)
@@ -438,6 +522,7 @@ Func InitBlueStacks2($bCheckOnly = False)
 EndFunc   ;==>InitBlueStacks2
 
 Func InitBlueStacks5($bCheckOnly = False)
+	OpenBlueStacks5Adb()
 	Local $bInstalled = InitBlueStacksX($bCheckOnly, True)
 	If $bInstalled And StringInStr($__BlueStacks_Version, "5.") <> 1 Then
 		If Not $bCheckOnly Then
@@ -689,7 +774,23 @@ Func SetScreenBlueStacks2()
 EndFunc   ;==>SetScreenBlueStacks2
 
 Func SetScreenBlueStacks5()
-    SetScreenBlueStacks2()
+
+	If Not InitAndroid() Then Return False
+
+	Local $cmdOutput, $process_killed, $aConfig
+
+	Local $sConfigFile = GetBlueStacks5ConfigFile()
+	If $sConfigFile Then
+		SetDebugLog("Configure BlueStacks5 screen config: " & $sConfigFile)
+		_FileReadToArray($sConfigFile, $aConfig, $FRTA_NOCOUNT)
+		_ChangeValueForKey($aConfig, "bst.instance.Nougat64.fb_height", $g_iAndroidClientHeight)
+		_ChangeValueForKey($aConfig, "bst.instance.Nougat64.fb_width", $g_iAndroidClientWidth)
+		_ChangeValueForKey($aConfig, "bst.instance.Nougat64.dpi", "160")
+		_FileWriteFromArray($sConfigFile, $aConfig)
+	EndIf
+
+	Return True
+
 EndFunc   ;==>SetScreenBlueStacks5
 
 Func RebootBlueStacksSetScreen()
@@ -744,7 +845,27 @@ Func RebootBlueStacks2SetScreen($bOpenAndroid = True)
 EndFunc   ;==>RebootBlueStacks2SetScreen
 
 Func RebootBlueStacks5SetScreen($bOpenAndroid = True)
-    RebootBlueStacks2SetScreen($bOpenAndroid)
+
+	;RebootAndroidSetScreenDefault()
+
+	If Not InitAndroid() Then Return False
+
+	ConfigBlueStacks5WindowManager()
+
+	; Close Android
+	CloseAndroid("RebootBlueStacks5SetScreen")
+	If _Sleep(1000) Then Return False
+
+	SetScreenAndroid()
+	If Not $g_bRunState Then Return False
+
+	If $bOpenAndroid Then
+		; Start Android
+		OpenAndroid(True)
+	EndIf
+
+	Return True
+
 EndFunc   ;==>RebootBlueStacks5SetScreen
 
 Func GetBlueStacksRunningInstance($bStrictCheck = True)
@@ -944,7 +1065,7 @@ Func CloseBlueStacks2()
 		Local $bError = False
 		For $sFile In $aFiles
 			Local $PID
-			$PID = ProcessExists2($sFile, $g_sAndroidInstance)
+			$PID = ProcessExists2($sFile, GetAndroidProgramParameter())
 			If $PID Then
 				ShellExecute(@WindowsDir & "\System32\taskkill.exe", " -f -t -pid " & $PID, "", Default, @SW_HIDE)
 				If _Sleep(1000) Then Return ; Give OS time to work
@@ -953,7 +1074,7 @@ Func CloseBlueStacks2()
 		If _Sleep(1000) Then Return ; Give OS time to work
 		For $sFile In $aFiles
 			Local $PID
-			$PID = ProcessExists2($sFile, $g_sAndroidInstance)
+			$PID = ProcessExists2($sFile, GetAndroidProgramParameter())
 			If $PID Then
 				SetLog($g_sAndroidEmulator & " failed to kill " & $sFile, $COLOR_ERROR)
 			EndIf
@@ -1057,7 +1178,7 @@ Func CloseUnsupportedBlueStacks2()
 EndFunc   ;==>CloseUnsupportedBlueStacks2
 
 Func CloseUnsupportedBlueStacks5()
-	Return CloseUnsupportedBlueStacksX()
+;TODO
 EndFunc   ;==>CloseUnsupportedBlueStacks5
 
 Func CloseUnsupportedBlueStacksX($bClose = True)
@@ -1078,20 +1199,48 @@ Func CloseUnsupportedBlueStacksX($bClose = True)
 EndFunc   ;==>CloseUnsupportedBlueStacksX
 
 Func GetBlueStacks5ConfigFile()
-	Return $__BlueStacks_User_Path & "bluestacks.conf"
+	Local $sConfigFile = $__BlueStacks_User_Path & "bluestacks.conf"
+	If FileExists($sConfigFile) Then Return $sConfigFile
+	SetDebugLog("Cannot find BlueStacks5 config: " & $sConfigFile, $COLOR_ERROR)
+	Return ""
 EndFunc   ;==>GetBlueStacks5ConfigFile
+
+Func _ChangeValueForKey(ByRef $aConfig, $sKey, $sValue)
+    For $i = 0 To UBound($aConfig) - 1
+        If StringLeft($aConfig[$i], StringLen($sKey) + 1) = $sKey & '=' Then
+            $aConfig[$i] = $sKey & '=' & '"' & $sValue & '"'
+            Return
+        EndIf
+    Next
+EndFunc   ;==>_ChangeValueForKey
 
 Func ConfigRead($sKey)
 	Local $aConfig, $aSplit
 	Local $sConfigFile = GetBlueStacks5ConfigFile()
-	_FileReadToArray($sConfigFile, $aConfig, $FRTA_NOCOUNT)
-    For $i = 0 To UBound($aConfig) - 1
-        If StringLeft($aConfig[$i], StringLen($sKey) + 1) = $sKey & '=' Then
-			$aSplit = StringSplit($aConfig[$i], '=')
-			SetDebugLog("ConfigRead" & $aSplit[1] & "=" & $aSplit[2])
-            Return StringMid($aSplit[2], 2, StringLen($aSplit[2]) - 2)
-        EndIf
-    Next
+	If $sConfigFile Then
+		_FileReadToArray($sConfigFile, $aConfig, $FRTA_NOCOUNT)
+		For $i = 0 To UBound($aConfig) - 1
+			If StringLeft($aConfig[$i], StringLen($sKey) + 1) = $sKey & '=' Then
+				$aSplit = StringSplit($aConfig[$i], '=')
+				SetDebugLog("ConfigRead: " & $aSplit[1] & "=" & $aSplit[2])
+				Return StringMid($aSplit[2], 2, StringLen($aSplit[2]) - 2)
+			EndIf
+		Next
+	EndIf
+	SetLog("ConfigRead Faile: " & $sKey, $COLOR_ERROR)
 	Return Null
 EndFunc   ;==>_ChangeValueForKey
 
+Func OpenBlueStacks5Adb()
+	Local $aConfig
+	Local $sConfigFile = GetBlueStacks5ConfigFile()
+	If $sConfigFile Then
+		SetDebugLog("Configure BlueStacks5 adb config: " & $sConfigFile)
+		_FileReadToArray($sConfigFile, $aConfig, $FRTA_NOCOUNT)
+		_ChangeValueForKey($aConfig, "bst.enable_adb_access", "1")
+		_FileWriteFromArray($sConfigFile, $aConfig)
+	EndIf
+
+	Return True
+
+EndFunc   ;==>SetScreenBlueStacks5
